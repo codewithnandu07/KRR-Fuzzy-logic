@@ -2,96 +2,110 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import time
+import random
 
-st.set_page_config(page_title="Fuzzy Traffic KRR", page_icon="🚦", layout="wide")
+st.set_page_config(page_title="KRR Fuzzy Traffic - LIVE", page_icon="🚦", layout="wide")
 
-st.title("🚦 Fuzzy Logic Smart Traffic Management - KRR")
-st.markdown("KRR Project | Knowledge Base + Inference | Fully Interactive")
+st.markdown("""
+<style>
+.stApp {background:#0f172a}
+h1 {color:#22c55e!important; text-align:center}
+</style>
+""", unsafe_allow_html=True)
 
-def tri(x,a,b,c):
-    if x<=a or x>=c: return 0
-    if x<=b: return (x-a)/(b-a) if b!=a else 1
-    return (c-x)/(c-b)
+st.title("🚦 KRR - Fuzzy Logic Smart Traffic LIVE")
+st.markdown("<p style='text-align:center;color:#94a3b8'>Live Simulation | Auto Updates Every 2 Sec</p>", unsafe_allow_html=True)
 
-def infer(v,w):
-    vL,vM,vH = tri(v,0,0,20), tri(v,10,25,40), tri(v,30,50,50)
-    wL,wM,wH = tri(w,0,0,40), tri(w,20,60,90), tri(w,60,120,120)
-    short = min(vL,wL)
-    med = max(min(vM,wM), min(wH,vL))
-    long = max(vH,wH)
-    total = short+med+long
-    if total==0: green=30
-    else: green = int((15*short + 35*med + 60*long)/total)
-    label = "LONG" if long>=med and long>=short else "MEDIUM" if med>=short else "SHORT"
-    rule = "R1: Density HIGH -> LONG" if label=="LONG" else "R2: Density MED -> MEDIUM" if label=="MEDIUM" else "R3: Density LOW -> SHORT"
+def trimf(x,a,b,c):
+    if x <= a or x >= c: return 0.0
+    if x <= b: return (x-a)/(b-a) if b!=a else 1.0
+    return (c-x)/(c-b) if c!=b else 1.0
+
+def fuzzy_infer(v, w):
+    v_low = trimf(v, 0, 0, 20)
+    v_med = trimf(v, 10, 25, 40)
+    v_high = trimf(v, 30, 50, 50)
+    w_low = trimf(w, 0, 0, 40)
+    w_med = trimf(w, 20, 60, 90)
+    w_high = trimf(w, 60, 120, 120)
+    r_short = min(v_low, w_low)
+    r_med = max(min(v_med, w_med), min(v_low, w_high))
+    r_long = max(v_high, w_high)
+    total = r_short + r_med + r_long
+    green = 30 if total==0 else int((15*r_short + 35*r_med + 60*r_long)/total)
+    if r_long >= r_med and r_long >= r_short:
+        label, rule = "LONG", "R1: Density HIGH -> LONG"
+    elif r_med >= r_short:
+        label, rule = "MEDIUM", "R2: Density MED -> MEDIUM"
+    else:
+        label, rule = "SHORT", "R3: Density LOW -> SHORT"
     return green, label, rule
 
-# SIDEBAR - KB
-st.sidebar.header("📥 Knowledge Base - Move Sliders")
-north = st.sidebar.slider("North Vehicles", 0, 50, 35)
-south = st.sidebar.slider("South Vehicles", 0, 50, 10)
-east = st.sidebar.slider("East Vehicles", 0, 50, 25)
-west = st.sidebar.slider("West Vehicles", 0, 50, 40)
+st.sidebar.header("⚙️ Controls")
+live_mode = st.sidebar.toggle("🔴 LIVE SIMULATION (Auto Move)", value=True)
 
-st.sidebar.markdown("---")
-w_n = st.sidebar.slider("North Waiting (s)", 0, 120, 80)
-w_s = st.sidebar.slider("South Waiting (s)", 0, 120, 20)
-w_e = st.sidebar.slider("East Waiting (s)", 0, 120, 50)
-w_w = st.sidebar.slider("West Waiting (s)", 0, 120, 90)
+if "n_v" not in st.session_state:
+    st.session_state.n_v, st.session_state.s_v, st.session_state.e_v, st.session_state.w_v = 35,10,25,40
+    st.session_state.n_w, st.session_state.s_w, st.session_state.e_w, st.session_state.w_w = 80,20,50,90
 
-roads = {"North":(north,w_n), "South":(south,w_s), "East":(east,w_e), "West":(west,w_w)}
+if live_mode:
+    st.session_state.n_v = max(0, min(50, st.session_state.n_v + random.randint(-3, 4)))
+    st.session_state.s_v = max(0, min(50, st.session_state.s_v + random.randint(-3, 4)))
+    st.session_state.e_v = max(0, min(50, st.session_state.e_v + random.randint(-3, 4)))
+    st.session_state.w_v = max(0, min(50, st.session_state.w_v + random.randint(-3, 4)))
+    st.session_state.n_w = max(0, min(120, st.session_state.n_w + random.randint(-2, 5)))
+    st.session_state.s_w = max(0, min(120, st.session_state.s_w + random.randint(-2, 5)))
+    st.session_state.e_w = max(0, min(120, st.session_state.e_w + random.randint(-2, 5)))
+    st.session_state.w_w = max(0, min(120, st.session_state.w_w + random.randint(-2, 5)))
+else:
+    # === TYPING ADDED HERE ===
+    st.sidebar.subheader("✍️ TYPE Vehicles Here")
+    st.session_state.n_v = st.sidebar.number_input("North Vehicles", 0, 50, st.session_state.n_v)
+    st.session_state.s_v = st.sidebar.number_input("South Vehicles", 0, 50, st.session_state.s_v)
+    st.session_state.e_v = st.sidebar.number_input("East Vehicles", 0, 50, st.session_state.e_v)
+    st.session_state.w_v = st.sidebar.number_input("West Vehicles", 0, 50, st.session_state.w_v)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("✍️ TYPE Waiting Time Here")
+    st.session_state.n_w = st.sidebar.number_input("North Waiting", 0, 120, st.session_state.n_w)
+    st.session_state.s_w = st.sidebar.number_input("South Waiting", 0, 120, st.session_state.s_w)
+    st.session_state.e_w = st.sidebar.number_input("East Waiting", 0, 120, st.session_state.e_w)
+    st.session_state.w_w = st.sidebar.number_input("West Waiting", 0, 120, st.session_state.w_w)
 
-# INFERENCE
-results=[]
-for road,(v,w) in roads.items():
-    green,label,rule = infer(v,w)
-    score = v + w/2
-    results.append([road,v,w,green,label,rule,score])
+roads = {"North":(st.session_state.n_v, st.session_state.n_w), "South":(st.session_state.s_v, st.session_state.s_w), "East":(st.session_state.e_v, st.session_state.e_w), "West":(st.session_state.w_v, st.session_state.w_w)}
+rows=[]
+for name,(v,w) in roads.items():
+    g,label,rule = fuzzy_infer(v,w)
+    rows.append([name,v,w,g,label,rule, v + w/2])
 
-df = pd.DataFrame(results, columns=["Road","Vehicles","Waiting","Green(s)","Decision","Rule Fired","Score"])
-best_row = df.loc[df['Score'].idxmax()]
+df = pd.DataFrame(rows, columns=["Road","Vehicles","Waiting","Green","Decision","Rule","Score"])
+best = df.loc[df["Score"].idxmax()]
 
-# MAIN
-col1, col2 = st.columns([2,1])
+st.subheader("📊 Live Inference Table (Changes every 2 sec)" if live_mode else "📊 Inference Table (Type to Update)")
+st.dataframe(df[["Road","Vehicles","Waiting","Green","Decision","Rule"]], use_container_width=True, hide_index=True)
+st.success(f"### 🟢 GREEN → {best['Road']} for {best['Green']}s ({best['Decision']})")
 
-with col1:
-    st.subheader("📊 Inference Table (Auto Updates)")
-    st.dataframe(df[["Road","Vehicles","Waiting","Green(s)","Decision","Rule Fired"]], use_container_width=True, hide_index=True)
-    st.success(f"### 🟢 GREEN -> {best_row['Road']} for {best_row['Green(s)']}s ({best_row['Decision']})")
-
-    st.subheader("📈 Graph - Vehicles vs Green Time")
+c1,c2 = st.columns(2)
+with c1:
+    st.subheader("📈 Vehicles vs Green")
     fig, ax = plt.subplots()
     ax.bar(df["Road"], df["Vehicles"], label="Vehicles", alpha=0.7)
-    ax.bar(df["Road"], df["Green(s)"], label="Green Time", alpha=0.7)
-    ax.legend()
+    ax.bar(df["Road"], df["Green"], label="Green", alpha=0.7)
+    ax.legend(); ax.grid(alpha=0.3)
     st.pyplot(fig)
 
-    st.subheader("🔺 Fuzzy Membership - Vehicle Density")
-    x = np.linspace(0,50,100)
-    fig2, ax2 = plt.subplots()
-    ax2.plot(x, [tri(i,0,0,20) for i in x], label='Low')
-    ax2.plot(x, [tri(i,10,25,40) for i in x], label='Medium')
-    ax2.plot(x, [tri(i,30,50,50) for i in x], label='High')
-    ax2.set_xlabel("Vehicles"); ax2.legend(); ax2.grid(True)
-    st.pyplot(fig2)
+with c2:
+    st.subheader("🚦 Intersection")
+    def col(r): return "#22c55e" if best["Road"]==r else "#ef4444"
+    st.markdown(f"""
+    <div style="background:#020617;padding:15px;border-radius:15px;text-align:center;color:white">
+        <div style="background:{col('North')};padding:10px;border-radius:10px;margin:5px">NORTH {best['Road']=='North' and '🟢' or '🔴'}</div>
+        <div style="display:flex;gap:10px"><div style="background:{col('West')};padding:10px;border-radius:10px;flex:1">WEST</div>
+        <div style="background:#1e293b;padding:10px;border-radius:10px;flex:1">+</div>
+        <div style="background:{col('East')};padding:10px;border-radius:10px;flex:1">EAST</div></div>
+        <div style="background:{col('South')};padding:10px;border-radius:10px;margin:5px">SOUTH</div>
+    </div>""", unsafe_allow_html=True)
 
-with col2:
-    st.subheader("🚦 Live Intersection")
-    html = f"""
-    <div style="background:#020617;padding:20px;border-radius:15px;text-align:center;color:white">
-        <div style="background:{'#22c55e' if best_row['Road']=='North' else '#ef4444'};padding:15px;border-radius:10px;margin:5px">NORTH {'🟢' if best_row['Road']=='North' else '🔴'}</div>
-        <div style="display:flex;justify-content:space-between">
-            <div style="background:{'#22c55e' if best_row['Road']=='West' else '#ef4444'};padding:15px;border-radius:10px">WEST {'🟢' if best_row['Road']=='West' else '🔴'}</div>
-            <div style="background:#334155;padding:15px;border-radius:10px">INTERSECTION</div>
-            <div style="background:{'#22c55e' if best_row['Road']=='East' else '#ef4444'};padding:15px;border-radius:10px">EAST {'🟢' if best_row['Road']=='East' else '🔴'}</div>
-        </div>
-        <div style="background:{'#22c55e' if best_row['Road']=='South' else '#ef4444'};padding:15px;border-radius:10px;margin:5px">SOUTH {'🟢' if best_row['Road']=='South' else '🔴'}</div>
-    </div>
-    """
-    st.markdown(html, unsafe_allow_html=True)
-    st.metric("North", f"{north} veh", f"{infer(north,w_n)[0]}s green")
-    st.metric("South", f"{south} veh", f"{infer(south,w_s)[0]}s green")
-    st.metric("East", f"{east} veh", f"{infer(east,w_e)[0]}s green")
-    st.metric("West", f"{west} veh", f"{infer(west,w_w)[0]}s green")
-
-st.download_button("📄 Download Full Report CSV", df.to_csv(index=False), "krr_traffic_report.csv")
+if live_mode:
+    time.sleep(2)
+    st.rerun()
